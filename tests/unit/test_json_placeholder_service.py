@@ -1,6 +1,5 @@
 # tests/test_json_placeholder_service.py
 import pytest
-import asyncio
 from src.services.api_services.json_placeholder_service import JsonPlaceholderService
 
 @pytest.fixture

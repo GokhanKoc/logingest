@@ -28,3 +28,15 @@ sources:
     enabled: true
     params:
       _limit: 3
+
+
+  - name: json_placeholder_todos
+    type: json_placeholder
+    endpoint: "https://jsonplaceholder.typicode.com/todos"
+    method: GET
+    product: demo
+    event_type: "todo_data"
+    severity: "info"
+    enabled: true
+    params:
+      _limit: 5
