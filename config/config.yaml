@@ -1,0 +1,30 @@
+# config/config.yaml
+database:
+  DB_HOST: ${DB_HOST:-localhost}
+  DB_PORT: ${DB_PORT:-5432}
+  DB_NAME: ${DB_NAME:-logingest}
+  DB_USER: ${DB_USER:-postgres}
+  DB_PASSWORD: ${DB_PASSWORD:-password}
+
+sources:
+  - name: json_placeholder_posts
+    type: json_placeholder
+    endpoint: "https://jsonplaceholder.typicode.com/posts"
+    method: GET
+    product: demo
+    event_type: "post_data"
+    severity: "info"
+    enabled: true
+    params:
+      _limit: 5
+
+  - name: json_placeholder_users
+    type: json_placeholder
+    endpoint: "https://jsonplaceholder.typicode.com/users"
+    method: GET
+    product: demo
+    event_type: "user_data"
+    severity: "info"
+    enabled: true
+    params:
+      _limit: 3
