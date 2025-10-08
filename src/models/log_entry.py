@@ -1,6 +1,6 @@
 # logingest/src/models/log_entry.py
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Union
 from .base_model import BaseModel
 
@@ -19,14 +19,13 @@ class LogEntry(BaseModel):
         self.product = product
         self.event_type = event_type
         self.severity = severity
-        # Convert raw_data to JSON string if it's a dict
+
+        # Convert raw_data to JSON string if it's a dict, otherwise use as-is
         if isinstance(raw_data, dict):
             self.raw_data = json.dumps(raw_data)
-        elif isinstance(raw_data, str):
-            self.raw_data = raw_data
         else:
-            self.raw_data = json.dumps(raw_data)
-        self.timestamp = timestamp or datetime.utcnow()
+            self.raw_data = str(raw_data)
+        self.timestamp = timestamp or datetime.now(timezone.utc)
         self.additional_fields = kwargs
 
     def to_dict(self) -> dict:
@@ -37,7 +36,7 @@ class LogEntry(BaseModel):
             "event_type": self.event_type,
             "severity": self.severity,
             "raw_data": self.raw_data,
-            "timestamp": self.timestamp.isoformat() + 'Z',
+            "timestamp": self.timestamp.isoformat(),
             **self.additional_fields
         }
         return base_dict

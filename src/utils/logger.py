@@ -1,9 +1,8 @@
 # logingest/src/utils/logger.py
 import logging
 import sys
-import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional
 import json
 from datetime import datetime
 
