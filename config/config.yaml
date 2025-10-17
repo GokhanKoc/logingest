@@ -1,12 +1,99 @@
 # config/config.yaml
-database:
-  DB_HOST: ${DB_HOST:-localhost}
-  DB_PORT: ${DB_PORT:-5432}
-  DB_NAME: ${DB_NAME:-logingest}
-  DB_USER: ${DB_USER:-postgres}
-  DB_PASSWORD: ${DB_PASSWORD:-password}
+# =====================
+# CyberArk Vault Configuration
+# =====================
+cyberark:
+  # Base URL for CyberArk PVWA (Password Vault Web Access)
+  base_url: "${CYBERARK_BASE_URL:-https://cyberark.example.com/PasswordVault}"
+  
+  # Authentication method (certificate, ldap, radius, cyberark)
+  auth_type: "${CYBERARK_AUTH_TYPE:-cyberark}"  
+  
+  # Authentication settings
+  auth:
+    # Recommended: Use environment variables for sensitive data
+    username: "${CYBERARK_USERNAME}"
+    password: "${CYBERARK_PASSWORD}"
+    new_password: ""  # For password rotation
+  
+  # SSL/TLS Configuration
+  ssl_verify: ${CYBERARK_SSL_VERIFY:-true}
+  ca_bundle: "${CYBERARK_CA_BUNDLE:-/etc/ssl/certs/ca-bundle.crt}"
 
+  # Connection settings
+  connection:
+    timeout: ${CYBERARK_TIMEOUT:-30}  # seconds
+    max_retries: ${CYBERARK_MAX_RETRIES:-3}
+    backoff_factor: ${CYBERARK_BACKOFF_FACTOR:-1}  # seconds
+
+# =====================
+# Application Secrets
+# =====================
+secrets:
+  # Default CyberArk safe where secrets are stored
+  default_safe: "${SECRETS_DEFAULT_SAFE:-APP_SAFE}"
+  
+  # Cache settings for secrets
+  cache:
+    enabled: true
+    ttl: 300  # 5 minutes
+    refresh_before_expiry: 0.8  # Refresh when 80% of TTL is reached
+  
+  # Secret references - format: "reference_name": "CyberArk:Path/To/Secret"
+  references:
+    json_placeholder_api_key: "CyberArk:Applications/JSONPlaceholder/API_Key"
+    database_credentials: "CyberArk:Databases/LogIngest/Credentials"
+    # Add more secret references as needed
+
+# =====================
+# Database Configuration
+# =====================
+database:
+  host: "${DB_HOST:-localhost}"
+  port: ${DB_PORT:-5432}
+  name: "${DB_NAME:-logingest}"
+  user: "${DB_USER:-postgres}"
+  # Password will be retrieved from CyberArk
+  password: "${secrets.database_credentials.password}"
+  ssl_mode: "${DB_SSLMODE:-prefer}"
+  connect_timeout: 10  # seconds
+  
+  # Connection pool settings
+  pool:
+    min_connections: 1
+    max_connections: 10
+    max_idle_time: 300  # seconds
+
+# =====================
+# Scheduler Configuration
+# =====================
+scheduler:
+  # Core settings
+  timezone: "${SCHEDULER_TIMEZONE:-UTC}"
+  max_parallel_jobs: ${SCHEDULER_MAX_JOBS:-3}
+  log_level: "${LOG_LEVEL:-INFO}"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  
+  # Global retry settings (can be overridden per job)
+  default_retry:
+    attempts: ${SCHEDULER_RETRY_ATTEMPTS:-3}
+    delay: ${SCHEDULER_RETRY_DELAY:-60}  # seconds
+    backoff: ${SCHEDULER_RETRY_BACKOFF:-2}  # exponential backoff multiplier
+  
+  # Monitoring and alerting
+  monitoring:
+    enabled: ${MONITORING_ENABLED:-true}
+    metrics_endpoint: "/metrics"
+    health_check_interval: ${HEALTH_CHECK_INTERVAL:-300}  # seconds
+    prometheus:
+      enabled: true
+      port: 9090
+      path: "/metrics"
+
+# =====================
+# Data Sources Configuration
+# =====================
 sources:
+  # Posts data - runs every 30 minutes
   - name: json_placeholder_posts
     type: json_placeholder
     endpoint: "https://jsonplaceholder.typicode.com/posts"
@@ -15,9 +102,36 @@ sources:
     event_type: "post_data"
     severity: "info"
     enabled: true
+    
+    # Authentication
+    auth:
+      type: "api_key"
+      key_name: "X-API-Key"
+      # Reference to secret in CyberArk
+      value: "${secrets.json_placeholder_api_key}"
+    
+    # Scheduling configuration
+    schedule: "*/30 * * * *"  # Every 30 minutes
+    timeout: 300  # 5 minutes
+    
+    # Retry configuration (overrides global settings)
+    retry:
+      attempts: 2
+      delay: 30
+      backoff: 2
+    
+    # Request parameters
     params:
       _limit: 5
+      _page: 1
+    
+    # Metadata
+    metadata:
+      description: "Fetches sample posts from JSONPlaceholder API"
+      owner: "data-team"
+      tags: ["api", "demo", "posts"]
 
+  # Users data - runs once per day at 2 AM
   - name: json_placeholder_users
     type: json_placeholder
     endpoint: "https://jsonplaceholder.typicode.com/users"
@@ -26,10 +140,34 @@ sources:
     event_type: "user_data"
     severity: "info"
     enabled: true
+    
+    # Authentication
+    auth:
+      type: "api_key"
+      key_name: "X-API-Key"
+      value: "${secrets.json_placeholder_api_key}"
+    
+    # Scheduling configuration
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    timeout: 600  # 10 minutes
+    
+    # Retry configuration
+    retry:
+      attempts: 3
+      delay: 60
+      
+    # Request parameters
     params:
       _limit: 3
+      _sort: "name"
+    
+    # Metadata
+    metadata:
+      description: "Fetches user data from JSONPlaceholder API"
+      owner: "data-team"
+      tags: ["api", "demo", "users"]
 
-
+  # Todos data - runs every hour at minute 15
   - name: json_placeholder_todos
     type: json_placeholder
     endpoint: "https://jsonplaceholder.typicode.com/todos"
@@ -38,5 +176,56 @@ sources:
     event_type: "todo_data"
     severity: "info"
     enabled: true
+    
+    # Authentication
+    auth:
+      type: "api_key"
+      key_name: "X-API-Key"
+      value: "${secrets.json_placeholder_api_key}"
+    
+    # Scheduling configuration
+    schedule: "15 * * * *"  # At minute 15 of every hour
+    timeout: 300  # 5 minutes
+    
+    # Retry configuration
+    retry:
+      attempts: 2
+      delay: 30
+    
+    # Request parameters
     params:
       _limit: 5
+      completed: "false"  # Only fetch incomplete todos
+    
+    # Metadata
+    metadata:
+      description: "Fetches todo items from JSONPlaceholder API"
+      owner: "data-team"
+      tags: ["api", "demo", "todos"]
+
+# =====================
+# Logging Configuration
+# =====================
+logging:
+  version: 1
+  disable_existing_loggers: false
+  formatters:
+    standard:
+      format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  handlers:
+    console:
+      class: "logging.StreamHandler"
+      level: "INFO"
+      formatter: "standard"
+      stream: "ext://sys.stdout"
+    file:
+      class: "logging.handlers.RotatingFileHandler"
+      level: "DEBUG"
+      formatter: "standard"
+      filename: "logs/app.log"
+      maxBytes: 10485760  # 10MB
+      backupCount: 5
+  root:
+    level: "INFO"
+    handlers: ["console", "file"]
+    propagate: true
