@@ -4,12 +4,16 @@ A scalable log ingestion service that collects logs from various sources and sto
 
 ## Features
 
-- Modular architecture with pluggable services
-- Asynchronous processing
-- Centralized configuration
-- Structured logging
-- Database migrations
-- Unit and integration tests
+- **Scheduler-based Architecture**: Cron-based job scheduling for continuous operation
+- **Parallel Execution**: Multiple services run concurrently with configurable limits
+- **Automatic Retries**: Built-in retry logic with exponential backoff
+- **Modular Design**: Pluggable services with easy extensibility
+- **Asynchronous Processing**: Non-blocking I/O for better performance
+- **Centralized Configuration**: YAML-based configuration with environment variable support
+- **Structured Logging**: Comprehensive logging with different log levels
+- **Database Integration**: PostgreSQL with automatic schema management
+- **Graceful Shutdown**: Clean container stops with signal handling
+- **Unit and Integration Tests**: Comprehensive test coverage
 
 ## Project Structure
 
@@ -32,7 +36,7 @@ logingest/
 └── requirements.txt   # Python dependencies
 ```
 
-## Installation
+## Quick Start
 
 ### Using Docker (Recommended)
 
@@ -42,9 +46,19 @@ logingest/
    cd logingest
    ```
 
-2. Start the services:
+2. Build and start the services:
    ```bash
-   docker-compose up -d
+   docker-compose up --build -d
+   ```
+
+3. View logs to see the scheduler in action:
+   ```bash
+   docker-compose logs -f app
+   ```
+
+4. Stop the services:
+   ```bash
+   docker-compose down
    ```
 
 ### Local Development
@@ -60,16 +74,41 @@ logingest/
    pip install -r requirements.txt
    ```
 
-3. Configure environment:
+3. Configure environment (optional):
    ```bash
    cp .env.example .env
    # Edit .env with your settings
    ```
 
-4. Run the application:
+4. Start PostgreSQL (if running locally):
+   ```bash
+   docker-compose up -d db
+   ```
+
+5. Run the application:
    ```bash
    python -m src.main
    ```
+
+## How It Works
+
+The application runs a **scheduler** that executes data ingestion jobs based on cron expressions defined in `config/config.yaml`:
+
+1. **Startup**: Application loads configuration and initializes the scheduler
+2. **Scheduling**: Each service is scheduled according to its cron expression
+3. **Execution**: Jobs run automatically at their scheduled times
+4. **Continuous**: Application runs indefinitely in Docker, fetching and storing data
+
+Example schedule configuration:
+```yaml
+sources:
+  - name: json_placeholder_posts
+    schedule: "*/30 * * * *"  # Every 30 minutes
+    endpoint: "https://jsonplaceholder.typicode.com/posts"
+    enabled: true
+```
+
+See [SCHEDULER.md](SCHEDULER.md) for detailed documentation.
 
 To check DB 
 
