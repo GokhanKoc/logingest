@@ -176,13 +176,13 @@ sources:
     event_type: "todo_data"
     severity: "info"
     enabled: true
-    
+
     # Authentication
     auth:
       type: "api_key"
       key_name: "X-API-Key"
       value: "${secrets.json_placeholder_api_key}"
-    
+
     # Scheduling configuration
     schedule: "15 * * * *"  # At minute 15 of every hour
     timeout: 300  # 5 minutes
