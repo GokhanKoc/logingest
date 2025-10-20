@@ -303,11 +303,6 @@ To add a new data source type:
 4. Register in `ServiceFactory`
 5. Add configuration to `config.yaml`
 
-### Dynamic Schedule Updates
-
-To change schedules without restart (future enhancement):
-- Implement config file watcher
-- Call `scheduler.remove_job()` and `scheduler.add_job()`
 
 ## Dependencies
 

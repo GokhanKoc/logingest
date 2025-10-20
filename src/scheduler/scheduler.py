@@ -118,16 +118,6 @@ class Scheduler:
             logger.error(f"Failed to add job '{job_id}': {str(e)}")
             raise
 
-    def remove_job(self, job_id: str):
-        """Remove a job from the scheduler."""
-        try:
-            self.scheduler.remove_job(job_id)
-            if job_id in self._jobs:
-                del self._jobs[job_id]
-            logger.info(f"Removed job '{job_id}'")
-        except Exception as e:
-            logger.error(f"Failed to remove job '{job_id}': {str(e)}")
-
     def get_job_status(self, job_id: str) -> Dict[str, Any]:
         """Get the status of a specific job."""
         if job_id not in self._jobs:
@@ -158,91 +148,6 @@ class Scheduler:
     def get_all_jobs_status(self) -> List[Dict[str, Any]]:
         """Get the status of all jobs."""
         return [self.get_job_status(job_id) for job_id in self._jobs.keys()]
-
-    async def execute_with_retry(
-        self,
-        job_id: str,
-        func: Callable,
-        *args,
-        **kwargs
-    ):
-        """
-        Execute a job with retry logic.
-
-        Args:
-            job_id: Job identifier
-            func: Async function to execute
-            *args, **kwargs: Function arguments
-        """
-        if job_id not in self._jobs:
-            logger.error(f"Job '{job_id}' not found")
-            return
-
-        job_info = self._jobs[job_id]
-        job_config = job_info['config']
-
-        # Get retry configuration
-        retry_config = job_config.get('retry', {})
-        if not retry_config:
-            retry_config = self.scheduler_config.get('default_retry', {})
-
-        max_attempts = retry_config.get('attempts', 3)
-        delay = retry_config.get('delay', 60)
-        backoff = retry_config.get('backoff', 2)
-
-        # Get timeout configuration
-        timeout = job_config.get('timeout', 300)
-
-        attempt = 0
-        last_error = None
-
-        while attempt < max_attempts:
-            attempt += 1
-            try:
-                logger.info(
-                    f"Executing job '{job_id}' (attempt {attempt}/{max_attempts})"
-                )
-
-                # Execute with timeout
-                result = await asyncio.wait_for(
-                    func(*args, **kwargs),
-                    timeout=timeout
-                )
-
-                # Update job statistics
-                job_info['last_run'] = datetime.now()
-                job_info['run_count'] += 1
-
-                logger.info(f"Job '{job_id}' completed successfully")
-                return result
-
-            except asyncio.TimeoutError:
-                last_error = f"Job timed out after {timeout} seconds"
-                logger.error(f"Job '{job_id}' {last_error}")
-
-            except Exception as e:
-                last_error = str(e)
-                logger.error(
-                    f"Job '{job_id}' failed on attempt {attempt}: {last_error}",
-                    exc_info=True
-                )
-
-            # Increment error count
-            job_info['error_count'] += 1
-
-            # Wait before retry (except on last attempt)
-            if attempt < max_attempts:
-                wait_time = delay * (backoff ** (attempt - 1))
-                logger.info(
-                    f"Retrying job '{job_id}' in {wait_time} seconds..."
-                )
-                await asyncio.sleep(wait_time)
-
-        # All attempts failed
-        logger.error(
-            f"Job '{job_id}' failed after {max_attempts} attempts. "
-            f"Last error: {last_error}"
-        )
 
     def start(self):
         """Start the scheduler."""
@@ -292,19 +197,3 @@ class Scheduler:
     def is_running(self) -> bool:
         """Check if the scheduler is running."""
         return self._running
-
-    async def run_forever(self):
-        """
-        Run the scheduler indefinitely.
-        Useful for Docker containers that need to stay alive.
-        """
-        self.start()
-
-        try:
-            # Keep the scheduler running
-            while self._running:
-                await asyncio.sleep(1)
-        except (KeyboardInterrupt, SystemExit):
-            logger.info("Received shutdown signal")
-        finally:
-            self.shutdown(wait=True)
